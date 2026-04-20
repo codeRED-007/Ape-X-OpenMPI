@@ -13,7 +13,7 @@ from tensorboardX import SummaryWriter
 import utils
 from wrapper import make_atari, wrap_atari_dqn
 from model import DuelingDQN
-from arguments import argparser
+from arguments_new import argparser
 
 LEARNER_RANK = 0
 TAG_PARAMS   = 20

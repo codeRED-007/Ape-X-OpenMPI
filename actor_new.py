@@ -29,7 +29,7 @@ import utils
 from memory import BatchStorage
 from wrapper import make_atari, wrap_atari_dqn
 from model import DuelingDQN
-from arguments import argparser
+from arguments_new import argparser
 
 # ── Rank constants (keep in sync with learner_mpi.py / replay_mpi.py) ────────
 LEARNER_RANK = 0

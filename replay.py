@@ -13,7 +13,7 @@ from zmq.asyncio import Context
 
 import utils
 from memory import CustomPrioritizedReplayBuffer
-from arguments import argparser
+from arguments_new import argparser
 
 
 def push_batch(buffer, data):

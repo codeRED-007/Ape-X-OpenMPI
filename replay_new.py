@@ -59,7 +59,7 @@ from mpi4py import MPI
 
 import utils
 from memory import CustomPrioritizedReplayBuffer
-from arguments import argparser
+from arguments_new import argparser
 
 # ── Rank constants (keep in sync with learner_mpi.py / actor_mpi.py) ─────────
 LEARNER_RANK = 0

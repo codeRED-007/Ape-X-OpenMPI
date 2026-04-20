@@ -56,7 +56,7 @@ from tensorboardX import SummaryWriter
 import utils
 import wrapper
 from model import DuelingDQN
-from arguments import argparser
+from arguments_new import argparser
 
 # ── Rank constants (keep in sync with actor_mpi.py / replay_mpi.py) ──────────
 LEARNER_RANK = 0

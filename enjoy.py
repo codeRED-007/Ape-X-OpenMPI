@@ -6,7 +6,7 @@ import numpy as np
 import utils
 from model import DuelingDQN
 from wrapper import make_atari, wrap_atari_dqn
-from arguments import argparser
+from arguments_new import argparser
 
 
 def get_environ():
