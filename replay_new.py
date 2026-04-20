@@ -169,6 +169,7 @@ def replay_main(comm: MPI.Comm, args) -> None:
         # ── 1. Receive experience batch from any actor ────────────────────────
         # MPI.ANY_SOURCE accepts from any actor rank (or any rank, but only
         # actors send TAG_BATCH so this is safe).
+        status = MPI.Status()
         if comm.iprobe(source=MPI.ANY_SOURCE, tag=TAG_BATCH, status=status):
             source = status.Get_source() # 1. Get the exact actor ID
             payload = comm.recv(source=source, tag=TAG_BATCH) # 2. Force recv to only pull from that actor
