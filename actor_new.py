@@ -144,7 +144,7 @@ def actor_main(comm: MPI.Comm, args) -> None:
 
             # isend: non-blocking — does not wait for replay to recv()
             req = comm.isend((batch, prios), dest=REPLAY_RANK, tag=TAG_BATCH)
-            print(f"[Actor {actor_id}] Sent batch to replay.", flush=True)
+            # print(f"[Actor {actor_id}] Sent batch to replay.", flush=True)
 
 
 def main() -> None:
