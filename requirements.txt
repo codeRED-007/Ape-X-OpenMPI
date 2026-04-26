@@ -1,0 +1,51 @@
+# ============================================================
+# Ape-X MPI — requirements.txt
+# ============================================================
+# Install with:
+#   pip install -r requirements.txt
+#
+# BEFORE running pip install, you must install OpenMPI system-wide:
+#   Ubuntu/Debian:  sudo apt install libopenmpi-dev openmpi-bin
+#   macOS:          brew install open-mpi
+#
+# For GPU support (CUDA 12.1), replace the torch line with:
+#   pip install torch --index-url https://download.pytorch.org/whl/cu121
+# Then remove the torch line below.
+# ============================================================
+
+# --- Core ML framework ---
+# CPU-only build. For GPU see note above.
+#torch==2.7.0
+
+# --- Numerical ---
+numpy>=1.24,<3.0
+
+# --- MPI binding (requires OpenMPI installed system-wide first) ---
+mpi4py==4.1.1
+
+# --- Atari environment stack ---
+gymnasium==1.3.0
+ale-py==0.11.2
+shimmy==2.0.1                   # gymnasium ↔ ALE compatibility shim
+
+# --- Atari ROMs ---
+# After installing, accept the licence and import the ROMs:
+#   python -m ale_py.roms
+# or: AutoROM --accept-license
+AutoROM==0.6.1
+
+# --- Image processing (used in wrapper.py for frame preprocessing) ---
+opencv-python-headless==4.13.0.92   # headless: no display/GUI needed on servers
+Pillow==12.1.1
+
+# --- Logging / Tensorboard ---
+tensorboardX==2.6.5
+
+# ============================================================
+# Quick-start (copy-paste):
+#
+#   sudo apt install libopenmpi-dev openmpi-bin   # system MPI
+#   pip install -r requirements.txt               # Python packages
+#   AutoROM --accept-license                      # Atari ROMs
+#   mpirun -n 11 --oversubscribe python apex_mpi.py
+# ============================================================
