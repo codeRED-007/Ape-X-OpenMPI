@@ -21,14 +21,20 @@ def main():
     
     args = argparser()
 
+    # Minimum: learner(1) + replay(1) + actor(1) + evaluator(1) = 4 ranks
+    assert size >= 4, (
+        f"Need at least 4 ranks, got {size}. "
+        f"Run with: mpirun -n 11 --oversubscribe python apex_mpi.py"
+    )
+
     # The rank topology defined in your files
     if rank == 0:
         learner_main(comm, args)
     elif rank == 1:
         replay_main(comm, args)
     elif rank == size - 1:
+        # Last rank is always the evaluator
         eval_main(comm, args)
-        print(f"[Evaluator] Rank {rank} standing by.")
     else:
         # Ranks 2 through (size - 2) become actors
         actor_main(comm, args)

@@ -211,9 +211,11 @@ def learner_main(comm: MPI.Comm, args) -> None:
         batch       = None
 
         # ── 5. Send updated priorities back to replay ─────────────────────────
-        # Replaces send_prios() Process + DEALER socket on port 51002 + Queue.
         # isend so we don't block the training loop waiting for replay to recv.
+        # We track the request and free it next iteration to avoid handle leaks.
         prio_req = comm.isend((idxes, prios.tolist()), dest=REPLAY_RANK, tag=TAG_PRIOS)
+        prio_req.Free()  # fire-and-forget: MPI manages the buffer lifetime
+
         idxes = prios = None
 
         learn_idx += 1

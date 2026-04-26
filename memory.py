@@ -419,10 +419,10 @@ class BatchStorage:
         self.next_q_values = []
 
     def compute_priorities(self):
-        # TODO: Should I seperate this method from BatchStorage class?
-        actions = np.array(self.actions, copy=False)
-        rewards = np.array(self.rewards, copy=False)
-        dones = np.array(self.dones, copy=False)
+        # np.array(..., copy=False) is broken in NumPy 2.x — use np.asarray instead.
+        actions = np.asarray(self.actions)
+        rewards = np.asarray(self.rewards)
+        dones = np.asarray(self.dones)
         q_values = np.stack(self.q_values)
         next_q_values = np.stack(self.next_q_values)
 

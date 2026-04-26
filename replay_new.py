@@ -83,20 +83,31 @@ def _push_batch(buffer: CustomPrioritizedReplayBuffer, payload: tuple) -> None:
     Unpack an (batch, prios) tuple received from an actor and add every
     transition to the replay buffer.
 
-    In the ZMQ version push_batch() received raw bytes and called
-    pickle.loads() itself.  Here mpi4py has already deserialised the
-    object, so we just unpack and add.
+    CustomPrioritizedReplayBuffer.add() signature:
+        add(state, action, reward, next_state, done, priority)
+
+    batch = [states, actions, rewards, next_states, dones]  — 5 lists
+    prios = numpy array of per-transition priorities
+
+    We zip the 5 batch lists together WITH prios to get one tuple per
+    transition, then unpack into add().
     """
     batch, prios = payload
-    for sample in zip(*batch, prios):
-        buffer.add(*sample)
+    states, actions, rewards, next_states, dones = batch
+    for state, action, reward, next_state, done, priority in zip(
+        states, actions, rewards, next_states, dones, prios
+    ):
+        buffer.add(state, action, reward, next_state, done, float(priority))
 
 
 def _update_prios(buffer: CustomPrioritizedReplayBuffer, payload: tuple) -> None:
     """
     Apply a (idxes, prios) priority update from the learner to the buffer.
+    idxes: list of int buffer indices
+    prios: list of float priorities (learner sends prios.tolist())
     """
     idxes, prios = payload
+    # update_priorities expects both as indexable sequences — lists are fine.
     buffer.update_priorities(idxes, prios)
 
 

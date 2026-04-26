@@ -142,9 +142,17 @@ def actor_main(comm: MPI.Comm, args) -> None:
             batch, prios = storage.make_batch()
             storage.reset()
 
-            # isend: non-blocking — does not wait for replay to recv()
-            req = comm.isend((batch, prios), dest=REPLAY_RANK, tag=TAG_BATCH)
-            # print(f"[Actor {actor_id}] Sent batch to replay.", flush=True)
+            # Ensure prios is a plain numpy array (float64) so mpi4py pickles
+            # it cleanly.  The '\xf0' UnpicklingError was caused by residual
+            # torch internal bytes leaking through when tensors were in the
+            # payload — prios from compute_priorities() are already numpy, but
+            # we cast explicitly to be safe.
+            safe_prios = np.asarray(prios, dtype=np.float64)
+
+            # Blocking send: prevents silent batch loss if MPI's eager buffer
+            # fills up when 8 actors fire simultaneously.  Game-step time
+            # dominates so the added latency is negligible.
+            comm.send((batch, safe_prios), dest=REPLAY_RANK, tag=TAG_BATCH)
 
 
 def main() -> None:
