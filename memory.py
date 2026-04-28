@@ -5,7 +5,7 @@ import random
 from collections import deque
 import operator
 import numpy as np
-
+from segment_tree_ctypes import SumSegmentTree, MinSegmentTree
 
 class SegmentTree(object):
     def __init__(self, capacity, operation, neutral_element):
@@ -90,56 +90,56 @@ class SegmentTree(object):
         return self._value[self._capacity + idx]
 
 
-class SumSegmentTree(SegmentTree):
-    def __init__(self, capacity):
-        super(SumSegmentTree, self).__init__(
-            capacity=capacity,
-            operation=operator.add,
-            neutral_element=0.0
-        )
+# class SumSegmentTree(SegmentTree):
+#     def __init__(self, capacity):
+#         super(SumSegmentTree, self).__init__(
+#             capacity=capacity,
+#             operation=operator.add,
+#             neutral_element=0.0
+#         )
 
-    def sum(self, start=0, end=None):
-        """Returns arr[start] + ... + arr[end]"""
-        return super(SumSegmentTree, self).reduce(start, end)
+#     def sum(self, start=0, end=None):
+#         """Returns arr[start] + ... + arr[end]"""
+#         return super(SumSegmentTree, self).reduce(start, end)
 
-    def find_prefixsum_idx(self, prefixsum):
-        """Find the highest index `i` in the array such that
-            sum(arr[0] + arr[1] + ... + arr[i - i]) <= prefixsum
-        if array values are probabilities, this function
-        allows to sample indexes according to the discrete
-        probability efficiently.
-        Parameters
-        ----------
-        perfixsum: float
-            upperbound on the sum of array prefix
-        Returns
-        -------
-        idx: int
-            highest index satisfying the prefixsum constraint
-        """
-        assert 0 <= prefixsum <= self.sum() + 1e-5
-        idx = 1
-        while idx < self._capacity:  # while non-leaf
-            if self._value[2 * idx] > prefixsum:
-                idx = 2 * idx
-            else:
-                prefixsum -= self._value[2 * idx]
-                idx = 2 * idx + 1
-        return idx - self._capacity
+#     def find_prefixsum_idx(self, prefixsum):
+#         """Find the highest index `i` in the array such that
+#             sum(arr[0] + arr[1] + ... + arr[i - i]) <= prefixsum
+#         if array values are probabilities, this function
+#         allows to sample indexes according to the discrete
+#         probability efficiently.
+#         Parameters
+#         ----------
+#         perfixsum: float
+#             upperbound on the sum of array prefix
+#         Returns
+#         -------
+#         idx: int
+#             highest index satisfying the prefixsum constraint
+#         """
+#         assert 0 <= prefixsum <= self.sum() + 1e-5
+#         idx = 1
+#         while idx < self._capacity:  # while non-leaf
+#             if self._value[2 * idx] > prefixsum:
+#                 idx = 2 * idx
+#             else:
+#                 prefixsum -= self._value[2 * idx]
+#                 idx = 2 * idx + 1
+#         return idx - self._capacity
 
 
-class MinSegmentTree(SegmentTree):
-    def __init__(self, capacity):
-        super(MinSegmentTree, self).__init__(
-            capacity=capacity,
-            operation=min,
-            neutral_element=float('inf')
-        )
+# class MinSegmentTree(SegmentTree):
+#     def __init__(self, capacity):
+#         super(MinSegmentTree, self).__init__(
+#             capacity=capacity,
+#             operation=min,
+#             neutral_element=float('inf')
+#         )
 
-    def min(self, start=0, end=None):
-        """Returns min(arr[start], ...,  arr[end])"""
+#     def min(self, start=0, end=None):
+#         """Returns min(arr[start], ...,  arr[end])"""
 
-        return super(MinSegmentTree, self).reduce(start, end)
+#         return super(MinSegmentTree, self).reduce(start, end)
 
 
 class ReplayBuffer(object):
@@ -286,13 +286,12 @@ class PrioritizedReplayBuffer(ReplayBuffer):
 
         weights = []
         p_min = self._it_min.min() / self._it_sum.sum()
-        max_weight = (p_min * len(self._storage)) ** (-beta)
 
-        for idx in idxes:
-            p_sample = self._it_sum[idx] / self._it_sum.sum()
-            weight = (p_sample * len(self._storage)) ** (-beta)
-            weights.append(weight / max_weight)
-        weights = np.array(weights)
+        total      = self._it_sum.sum()          # one call
+        p_min      = self._it_min.min()          # one call
+        leaf_vals  = self._it_sum.get_batch(idxes)        # one C call → numpy array
+        weights    = (leaf_vals / total * len(self._storage)) ** (-beta)
+        weights   /= weights.max()
         encoded_sample = self._encode_sample(idxes)
         return tuple(list(encoded_sample) + [weights, idxes])
 
@@ -310,13 +309,10 @@ class PrioritizedReplayBuffer(ReplayBuffer):
             variable `idxes`.
         """
         assert len(idxes) == len(priorities)
-        for idx, priority in zip(idxes, priorities):
-            assert priority > 0
-            assert 0 <= idx < len(self._storage)
-            self._it_sum[idx] = priority ** self._alpha
-            self._it_min[idx] = priority ** self._alpha
-
-            self._max_priority = max(self._max_priority, priority)
+        alpha_prios = np.array(priorities) ** self._alpha
+        self._it_sum.set_batch(idxes, alpha_prios)
+        self._it_min.set_batch(idxes, alpha_prios)
+        self._max_priority = max(self._max_priority, max(priorities))
 
 
 class CustomPrioritizedReplayBuffer(PrioritizedReplayBuffer):
@@ -345,21 +341,13 @@ class CustomPrioritizedReplayBuffer(PrioritizedReplayBuffer):
         self._max_priority = max(self._max_priority, priority)
 
     def _encode_sample(self, idxes):
-        obses_t, actions, rewards, obses_tp1, dones = [], [], [], [], []
-        for i in idxes:
-            data = self._storage[i]
-            obs_t, action, reward, obs_tp1, done = data
-            # FIXED
-            obses_t.append(np.asarray(obs_t))
-            actions.append(np.asarray(action))
-            rewards.append(reward)
-            obses_tp1.append(np.asarray(obs_tp1))
-            dones.append(done)
-        return (obses_t,
+        rows = [self._storage[i] for i in idxes]  # one list comp
+        states, actions, rewards, next_states, dones = zip(*rows)
+        return (list(states),
                 np.array(actions),
-                np.array(rewards),
-                obses_tp1,
-                np.array(dones))
+                np.array(rewards, dtype=np.float32),
+                list(next_states),
+                np.array(dones,   dtype=np.float32))
 
 
 class BatchStorage:
