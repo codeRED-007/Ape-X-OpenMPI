@@ -83,6 +83,14 @@ _lib.st_min_total.argtypes = [ctypes.POINTER(_CTree)]
 _lib.st_get.restype  = ctypes.c_double
 _lib.st_get.argtypes = [ctypes.POINTER(_CTree), ctypes.c_int]
 
+_lib.st_get_batch.restype  = None
+_lib.st_get_batch.argtypes = [
+    ctypes.POINTER(_CTree),
+    ctypes.POINTER(ctypes.c_int),
+    ctypes.POINTER(ctypes.c_double),
+    ctypes.c_int,
+]
+
 _lib.st_find_prefixsum_idx.restype  = ctypes.c_int
 _lib.st_find_prefixsum_idx.argtypes = [ctypes.POINTER(_CTree), ctypes.c_double]
 
@@ -181,6 +189,19 @@ class SumSegmentTree:
     def find_prefixsum_idx(self, prefixsum: float) -> int:
         """Single prefix-sum search (used by _sample_proportional)."""
         return _lib.st_find_prefixsum_idx(self._tree, prefixsum)
+
+    def get_batch(self, idxes) -> np.ndarray:
+        """
+        Read leaf values for all idxes in one C call.
+        Returns np.ndarray of float64, shape (len(idxes),).
+        Replaces 512 individual __getitem__ calls in sample().
+        """
+        idxes_np = np.asarray(idxes, dtype=np.int32)
+        out      = np.empty(len(idxes_np), dtype=np.float64)
+        ip, _ia  = _int_ptr(idxes_np)
+        dp, _da  = _dbl_ptr(out)
+        _lib.st_get_batch(self._tree, ip, dp, len(idxes_np))
+        return out
 
     def find_prefixsum_batch(self, masses) -> np.ndarray:
         """
