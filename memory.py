@@ -5,7 +5,7 @@ import random
 from collections import deque
 import operator
 import numpy as np
-
+from segment_tree_ctypes import SumSegmentTree, MinSegmentTree
 
 class SegmentTree(object):
     def __init__(self, capacity, operation, neutral_element):
@@ -53,39 +53,56 @@ class SegmentTree(object):
         return self._value[self._capacity + idx]
 
 
-class SumSegmentTree(SegmentTree):
-    def __init__(self, capacity):
-        super(SumSegmentTree, self).__init__(
-            capacity=capacity,
-            operation=operator.add,
-            neutral_element=0.0
-        )
+# class SumSegmentTree(SegmentTree):
+#     def __init__(self, capacity):
+#         super(SumSegmentTree, self).__init__(
+#             capacity=capacity,
+#             operation=operator.add,
+#             neutral_element=0.0
+#         )
 
-    def sum(self, start=0, end=None):
-        return super(SumSegmentTree, self).reduce(start, end)
+#     def sum(self, start=0, end=None):
+#         """Returns arr[start] + ... + arr[end]"""
+#         return super(SumSegmentTree, self).reduce(start, end)
 
-    def find_prefixsum_idx(self, prefixsum):
-        assert 0 <= prefixsum <= self.sum() + 1e-5
-        idx = 1
-        while idx < self._capacity: 
-            if self._value[2 * idx] > prefixsum:
-                idx = 2 * idx
-            else:
-                prefixsum -= self._value[2 * idx]
-                idx = 2 * idx + 1
-        return idx - self._capacity
+#     def find_prefixsum_idx(self, prefixsum):
+#         """Find the highest index `i` in the array such that
+#             sum(arr[0] + arr[1] + ... + arr[i - i]) <= prefixsum
+#         if array values are probabilities, this function
+#         allows to sample indexes according to the discrete
+#         probability efficiently.
+#         Parameters
+#         ----------
+#         perfixsum: float
+#             upperbound on the sum of array prefix
+#         Returns
+#         -------
+#         idx: int
+#             highest index satisfying the prefixsum constraint
+#         """
+#         assert 0 <= prefixsum <= self.sum() + 1e-5
+#         idx = 1
+#         while idx < self._capacity:  # while non-leaf
+#             if self._value[2 * idx] > prefixsum:
+#                 idx = 2 * idx
+#             else:
+#                 prefixsum -= self._value[2 * idx]
+#                 idx = 2 * idx + 1
+#         return idx - self._capacity
 
 
-class MinSegmentTree(SegmentTree):
-    def __init__(self, capacity):
-        super(MinSegmentTree, self).__init__(
-            capacity=capacity,
-            operation=min,
-            neutral_element=float('inf')
-        )
+# class MinSegmentTree(SegmentTree):
+#     def __init__(self, capacity):
+#         super(MinSegmentTree, self).__init__(
+#             capacity=capacity,
+#             operation=min,
+#             neutral_element=float('inf')
+#         )
 
-    def min(self, start=0, end=None):
-        return super(MinSegmentTree, self).reduce(start, end)
+#     def min(self, start=0, end=None):
+#         """Returns min(arr[start], ...,  arr[end])"""
+
+#         return super(MinSegmentTree, self).reduce(start, end)
 
 
 class ReplayBuffer(object):
