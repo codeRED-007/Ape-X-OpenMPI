@@ -54,6 +54,8 @@ Rank layout (must match learner_mpi.py / actor_mpi.py):
 
 import os
 import time
+import gc
+import ctypes
 
 from mpi4py import MPI
 
@@ -190,16 +192,23 @@ def replay_main(comm: MPI.Comm, args) -> None:
             batch_recv_cnt += 1
 
             # ── Logging (mirrors recv_batch_worker's cnt % 100 check) ─────────
+            # ── Logging (mirrors recv_batch_worker's cnt % 100 check) ─────────
             if batch_recv_cnt % 100 == 0:
                 elapsed = time.time() - ts
-                # each batch contains args.send_interval transitions
                 fps = (args.send_interval * batch_recv_cnt) / elapsed
                 print(
                     "[Replay] Buffer: {:,} transitions / Intake FPS: {:.1f}".format(
                         len(buffer), fps
                     ), flush=True
                 )
-                # reset the window so FPS reflects recent throughput
+                
+                # ── FIX: Force Python to return memory to the OS ──────────────
+                gc.collect()
+                try:
+                    ctypes.CDLL("libc.so.6").malloc_trim(0)
+                except Exception:
+                    pass
+
                 batch_recv_cnt = 0
                 ts = time.time()
 

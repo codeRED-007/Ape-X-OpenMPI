@@ -107,22 +107,13 @@ def _broadcast_params(comm: MPI.Comm, model: torch.nn.Module) -> list[MPI.Reques
 
 
 def _batch_to_device(batch: list, device: torch.device) -> tuple:
-    """
-    Move a raw batch received from replay onto the training device.
-
-    In the ZMQ version recv_batch() did this inside a dedicated Process +
-    Thread, with a multiprocessing.Queue feeding the train() loop.  Here we
-    do it inline: the data arrives from replay already as Python objects
-    (mpi4py deserialises automatically), we just cast + move to GPU.
-
-    Returns (states, actions, rewards, next_states, dones, weights, idxes).
-    """
     states, actions, rewards, next_states, dones, weights, idxes = batch
 
-    states      = torch.FloatTensor(np.array([np.array(s) for s in states])).to(device)
+    # ── FIX: Explicitly cast to float32 to prevent 64-bit memory spikes ───────
+    states      = torch.from_numpy(np.stack([np.asarray(s, dtype=np.float32) for s in states])).to(device)
     actions     = torch.LongTensor(actions).to(device)
     rewards     = torch.FloatTensor(rewards).to(device)
-    next_states = torch.FloatTensor(np.array([np.array(s) for s in next_states])).to(device)
+    next_states = torch.from_numpy(np.stack([np.asarray(s, dtype=np.float32) for s in next_states])).to(device)
     dones       = torch.FloatTensor(dones).to(device)
     weights     = torch.FloatTensor(weights).to(device)
 
