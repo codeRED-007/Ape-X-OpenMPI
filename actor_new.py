@@ -96,64 +96,46 @@ def actor_main(comm: MPI.Comm, args) -> None:
     state, _ = env.reset()
 
     while True:
-        # ── Step the environment ──────────────────────────────────────────────
-        action, q_values = model.act(torch.FloatTensor(np.array(state)), epsilon)
-        next_state, reward, terminated, truncated, _ = env.step(action)
-        done = terminated or truncated
+            action, q_values = model.act(torch.FloatTensor(np.array(state)), epsilon)
+            next_state, reward, terminated, truncated, _ = env.step(action)
+            done = terminated or truncated
 
-        storage.add(state, reward, action, done, q_values)
+            storage.add(state, reward, action, done, q_values)
 
-        state           = next_state
-        episode_reward += reward
-        episode_length += 1
-        actor_idx      += 1
+            state           = next_state
+            episode_reward += reward
+            episode_length += 1
+            actor_idx      += 1
 
-        # ── Episode bookkeeping ───────────────────────────────────────────────
-        if done or episode_length == args.max_episode_length:
-            state, _ = env.reset()
-            writer.add_scalar("actor/episode_reward", episode_reward, episode_idx)
-            writer.add_scalar("actor/episode_length", episode_length, episode_idx)
-            episode_reward = 0
-            episode_length = 0
-            episode_idx   += 1
+            if done or episode_length == args.max_episode_length:
+                state, _ = env.reset()
+                writer.add_scalar("actor/episode_reward", episode_reward, episode_idx)
+                writer.add_scalar("actor/episode_length", episode_length, episode_idx)
+                episode_reward = 0
+                episode_length = 0
+                episode_idx   += 1
 
-        # ── Poll for updated weights (non-blocking) ───────────────────────────
-        # In the ZMQ version this was a separate Process (recv_param) passing
-        # weights through a multiprocessing.Queue.  Here we fold it into the
-        # main loop with iprobe so we never block the game loop.
-        #
-        # iprobe returns True if a message is waiting but does NOT consume it.
-        # We only call recv() when we know something is there, so this is
-        # always instant.
-        if actor_idx % args.update_interval == 0:
-            if comm.iprobe(source=LEARNER_RANK, tag=TAG_PARAMS):
+            # ── FIX: Eagerly drain params to prevent MPI buffer bloat ─────────────
+            has_new_params = False
+            while comm.iprobe(source=LEARNER_RANK, tag=TAG_PARAMS):
                 params = comm.recv(source=LEARNER_RANK, tag=TAG_PARAMS)
+                has_new_params = True
+                
+            if has_new_params:
                 model.load_state_dict(params)
-                print(f"[Actor {actor_id}] Updated parameters.", flush=True)
 
-        # ── Send experience batch to replay ───────────────────────────────────
-        # In the ZMQ version an "outstanding" counter enforced backpressure
-        # (don't queue more than max_outstanding unacknowledged sends).
-        # With MPI isend the message goes into MPI's internal buffer and
-        # returns immediately; we just fire and forget here.  If you need
-        # strict backpressure you can track Request objects and call
-        # req.Wait() before issuing the next send.
-        if len(storage) == args.send_interval:
-            batch, prios = storage.make_batch()
-            storage.reset()
+            # ── Send experience batch to replay ───────────────────────────────────
+            if len(storage) == args.send_interval:
+                batch, prios = storage.make_batch()
+                storage.reset()
 
-            # Ensure prios is a plain numpy array (float64) so mpi4py pickles
-            # it cleanly.  The '\xf0' UnpicklingError was caused by residual
-            # torch internal bytes leaking through when tensors were in the
-            # payload — prios from compute_priorities() are already numpy, but
-            # we cast explicitly to be safe.
-            safe_prios = np.asarray(prios, dtype=np.float64)
+                # ── FIX: Convert LazyFrames to pure uint8 arrays ──────────────────
+                states_np = [np.asarray(s, dtype=np.uint8) for s in batch[0]]
+                next_states_np = [np.asarray(s, dtype=np.uint8) for s in batch[3]]
+                clean_batch = [states_np, batch[1], batch[2], next_states_np, batch[4]]
 
-            # Blocking send: prevents silent batch loss if MPI's eager buffer
-            # fills up when 8 actors fire simultaneously.  Game-step time
-            # dominates so the added latency is negligible.
-            comm.send((batch, safe_prios), dest=REPLAY_RANK, tag=TAG_BATCH)
-
+                safe_prios = np.asarray(prios, dtype=np.float64)
+                comm.send((clean_batch, safe_prios), dest=REPLAY_RANK, tag=TAG_BATCH)
 
 def main() -> None:
     comm = MPI.COMM_WORLD
